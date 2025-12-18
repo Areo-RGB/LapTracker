@@ -53,12 +53,38 @@ const TimerOverlay = ({ isMonitoring, lastActivity, hasLaps }: { isMonitoring: b
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>(Tab.CONFIG);
+  // Initialize tab from URL hash
+  const getInitialTab = () => {
+    const hash = window.location.hash.toLowerCase();
+    if (hash === '#display') return Tab.DISPLAY;
+    return Tab.CONFIG;
+  };
+
+  const [activeTab, setActiveTab] = useState<Tab>(getInitialTab);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [laps, setLaps] = useState<Lap[]>([]);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [lastActivity, setLastActivity] = useState<number>(0);
   const [showSettings, setShowSettings] = useState(false);
+
+  // Sync URL hash with active tab
+  useEffect(() => {
+    const newHash = activeTab === Tab.DISPLAY ? '#display' : '#monitor';
+    if (window.location.hash !== newHash) {
+      window.history.replaceState(null, '', newHash);
+    }
+  }, [activeTab]);
+
+  // Listen for browser back/forward
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash === '#display') setActiveTab(Tab.DISPLAY);
+      else setActiveTab(Tab.CONFIG);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Core logic to record a lap
   const handleMotionTriggered = useCallback((timestamp: number) => {
