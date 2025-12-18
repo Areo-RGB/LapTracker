@@ -8,7 +8,7 @@
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -16,15 +16,22 @@
         theme: {
           extend: {
             colors: {
-              gray: {
-                900: '#111827',
-                800: '#1f2937',
-                700: '#374151',
+              slate: {
+                850: '#1e293b', // Custom lighter slate for cards
+                900: '#0f172a',
+                950: '#020617',
+              },
+              cyan: {
+                450: '#0ea5e9', // Deep sky
+                500: '#06b6d4',
               }
             },
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
               mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
+            },
+            animation: {
+              'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
             }
           }
         }
@@ -40,6 +47,13 @@
           -ms-overflow-style: none;  /* IE and Edge */
           scrollbar-width: none;  /* Firefox */
       }
+      
+      /* Smooth gradients */
+      .text-gradient {
+        background-clip: text;
+        -webkit-background-clip: text;
+        color: transparent;
+      }
     </style>
   <script type="importmap">
 {
@@ -53,7 +67,7 @@
 }
 </script>
 </head>
-  <body class="bg-black text-white overflow-hidden">
+  <body class="bg-slate-950 text-slate-100 overflow-hidden antialiased selection:bg-cyan-500/30">
     <div id="root"></div>
   </body>
 </html>

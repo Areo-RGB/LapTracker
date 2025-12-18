@@ -27,23 +27,23 @@ const TimerOverlay = ({ isMonitoring, lastActivity, hasLaps }: { isMonitoring: b
 
   return (
     <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none">
-      <div className={`px-3 py-2 rounded-lg backdrop-blur-md border shadow-lg transition-colors duration-300 ${
+      <div className={`px-4 py-3 rounded-xl backdrop-blur-md border shadow-2xl transition-all duration-300 ${
         !isMonitoring 
-          ? 'bg-gray-900/60 border-gray-700' 
+          ? 'bg-slate-900/80 border-slate-700/50' 
           : !hasLaps 
-            ? 'bg-yellow-900/40 border-yellow-700/50' 
-            : 'bg-black/60 border-cyan-900/50'
+            ? 'bg-amber-900/40 border-amber-700/30' 
+            : 'bg-slate-900/80 border-cyan-500/30 shadow-cyan-500/10'
       }`}>
-        <div className="flex items-center gap-2 mb-1">
-          <div className={`w-2 h-2 rounded-full ${isMonitoring ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-          <span className="text-[10px] uppercase tracking-wider font-bold text-gray-400">
-            {!isMonitoring ? 'OFFLINE' : !hasLaps ? 'WAITING FOR START' : 'CURRENT LAP'}
+        <div className="flex items-center gap-2.5 mb-1.5">
+          <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${isMonitoring ? 'bg-emerald-400 text-emerald-400 animate-pulse' : 'bg-rose-500 text-rose-500'}`} />
+          <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+            {!isMonitoring ? 'OFFLINE' : !hasLaps ? 'READY' : 'CURRENT LAP'}
           </span>
         </div>
         
-        <div className="font-mono text-2xl font-bold tabular-nums text-white leading-none">
+        <div className="font-mono text-3xl font-bold tabular-nums text-white leading-none tracking-tight drop-shadow-lg">
           {(time / 1000).toFixed(2)}
-          <span className="text-sm text-gray-500 ml-1">s</span>
+          <span className="text-sm text-slate-500 ml-1 font-sans font-medium">s</span>
         </div>
       </div>
     </div>
@@ -92,13 +92,26 @@ export default function App() {
   }, []);
 
   const toggleMonitoring = useCallback(() => {
-    // If we're starting fresh from a finished session, reset
-    const completedLaps = laps.filter(l => l.duration > 0).length;
-    if (!isMonitoring && settings.targetLaps > 0 && completedLaps >= settings.targetLaps) {
-      resetLaps();
+    if (isMonitoring) {
+      setIsMonitoring(false);
+    } else {
+      const completedLaps = laps.filter(l => l.duration > 0).length;
+      const isFinished = settings.targetLaps > 0 && completedLaps >= settings.targetLaps;
+      
+      setIsMonitoring(true);
+
+      // If starting fresh (no laps or previous session finished), trigger the timer start immediately
+      if (laps.length === 0 || isFinished) {
+        const now = Date.now();
+        setLastActivity(now);
+        setLaps([{
+          id: crypto.randomUUID(),
+          timestamp: now,
+          duration: 0
+        }]);
+      }
     }
-    setIsMonitoring(prev => !prev);
-  }, [isMonitoring, laps, settings.targetLaps, resetLaps]);
+  }, [isMonitoring, laps, settings.targetLaps]);
 
   const handleEnterDisplay = useCallback(() => {
     setActiveTab(Tab.DISPLAY);
@@ -137,33 +150,46 @@ export default function App() {
   const isDisplayMode = activeTab === Tab.DISPLAY;
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-gray-950 text-white overflow-hidden font-sans">
+    <div className="h-screen w-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden font-sans selection:bg-cyan-500/30">
       
       {!isDisplayMode && (
-        <header className="flex-none h-14 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4 z-20">
-          <div className="flex items-center gap-2 text-cyan-400">
-            <Activity size={20} />
-            <h1 className="font-bold tracking-wider uppercase text-sm md:text-base">LapTrack AI</h1>
-          </div>
+        <header className="flex-none h-16 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-6 z-20">
           <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-tr from-cyan-500 to-blue-600 p-2 rounded-lg shadow-lg shadow-cyan-500/20">
+              <Activity size={20} className="text-white" />
+            </div>
+            <div>
+              <h1 className="font-bold tracking-wide uppercase text-sm md:text-base text-white">LapTrack AI</h1>
+              <span className="text-[10px] text-slate-500 font-medium tracking-wider uppercase block -mt-0.5">Motion Timer</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
             {laps.length > 0 && (
                <button 
                onClick={resetLaps}
-               className="p-2 text-red-400 hover:bg-red-900/20 rounded-full transition-colors"
+               className="p-2.5 text-rose-400 hover:bg-rose-950/30 hover:text-rose-300 rounded-full transition-all border border-transparent hover:border-rose-900/50"
                title="Reset Laps"
              >
                <Trash2 size={18} />
              </button>
             )}
-            <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono border ${isMonitoring ? 'border-green-500/50 bg-green-500/10 text-green-400' : 'border-gray-700 bg-gray-800 text-gray-400'}`}>
-              <div className={`w-2 h-2 rounded-full ${isMonitoring ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}></div>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono font-bold border transition-all duration-500 ${isMonitoring ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)]' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>
+              <div className={`w-2 h-2 rounded-full ${isMonitoring ? 'bg-emerald-400 animate-pulse shadow-[0_0_8px_currentColor]' : 'bg-slate-500'}`}></div>
               {isMonitoring ? 'ACTIVE' : 'IDLE'}
             </div>
           </div>
         </header>
       )}
 
-      <main className="flex-1 relative overflow-hidden flex flex-col">
+      <main className="flex-1 relative overflow-hidden flex flex-col bg-slate-950">
+        {/* Background Grid Pattern */}
+        <div className="absolute inset-0 opacity-10 pointer-events-none" 
+             style={{ 
+               backgroundImage: `radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.15) 1px, transparent 0)`,
+               backgroundSize: '40px 40px' 
+             }} 
+        />
+
         <div className={`absolute inset-0 z-0 ${activeTab === Tab.CONFIG ? 'visible' : 'invisible pointer-events-none opacity-0'}`}>
            <MotionEngine 
             settings={settings}
@@ -192,7 +218,7 @@ export default function App() {
         </div>
 
         {activeTab === Tab.DISPLAY && (
-          <div className="absolute inset-0 z-20 bg-gray-950">
+          <div className="absolute inset-0 z-20 bg-slate-950">
             <DisplayTab 
               stats={stats} 
               laps={laps} 
@@ -206,20 +232,20 @@ export default function App() {
       </main>
 
       {!isDisplayMode && (
-        <nav className="flex-none h-16 bg-gray-900 border-t border-gray-800 flex items-stretch z-30">
+        <nav className="flex-none h-20 bg-slate-950 border-t border-slate-800 flex items-stretch z-30 px-6 pb-2 pt-2 gap-4">
           <button
             onClick={() => setActiveTab(Tab.CONFIG)}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${activeTab === Tab.CONFIG ? 'text-cyan-400 bg-gray-800/50' : 'text-gray-500 hover:text-gray-300'}`}
+            className={`flex-1 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all duration-300 ${activeTab === Tab.CONFIG ? 'bg-slate-900 text-cyan-400 border border-slate-800 shadow-lg shadow-black/50' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-900/50'}`}
           >
-            <Settings size={20} />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Config</span>
+            <Settings size={22} className={activeTab === Tab.CONFIG ? 'drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : ''} />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Config</span>
           </button>
           <button
             onClick={handleEnterDisplay}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors text-gray-500 hover:text-gray-300`}
+            className={`flex-1 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all duration-300 text-slate-500 hover:text-slate-300 hover:bg-slate-900/50`}
           >
-            <Timer size={20} />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Display</span>
+            <Timer size={22} />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Display</span>
           </button>
         </nav>
       )}

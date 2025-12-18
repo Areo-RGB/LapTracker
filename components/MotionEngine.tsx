@@ -52,7 +52,6 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
     setupCamera();
 
     return () => {
-      // Cleanup stream on unmount
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
@@ -73,7 +72,6 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
         return;
       }
 
-      // Match canvas size to video size
       if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -82,11 +80,11 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) return;
 
-      // 1. Draw the current frame (Sharp background)
+      // 1. Draw the current frame
       ctx.filter = 'none';
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // Calculate geometry from percentages
+      // Calculate geometry
       const centerX = (settings.tripwireX / 100) * canvas.width;
       const centerY = (settings.tripwireY / 100) * canvas.height;
       const zoneW = Math.max(2, (settings.detectionWidth / 100) * canvas.width);
@@ -95,37 +93,46 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
       const sampleX = Math.max(0, Math.min(canvas.width - zoneW, centerX - zoneW / 2));
       const sampleY = Math.max(0, Math.min(canvas.height - zoneH, centerY - zoneH / 2));
 
-      // 2. If monitoring, draw the detection zone with blur to show activity area
+      // 2. Monitoring visual effect (blur)
+      // We apply this before capturing data so we detect on the blurred image (reduces noise)
       if (isMonitoring) {
         ctx.filter = 'blur(4px)'; 
         ctx.drawImage(video, sampleX, sampleY, zoneW, zoneH, sampleX, sampleY, zoneW, zoneH);
         ctx.filter = 'none';
       }
 
-      // 3. Draw Zone Overlay Box
+      // 3. CAPTURE DATA FOR MOTION DETECTION
+      // Critical: Capture BEFORE drawing any overlays (boxes, text, etc.) to prevent feedback loops.
+      let currentFrameData: Uint8ClampedArray | null = null;
+      if (isMonitoring) {
+        currentFrameData = ctx.getImageData(sampleX, sampleY, zoneW, zoneH).data;
+      }
+
+      // 4. Draw Zone Overlay Box (Neon Style)
+      // These overlays change color based on state, so they must happen AFTER capture.
       const now = Date.now();
       const onCooldown = now - lastTriggerRef.current < settings.cooldown;
       
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = onCooldown ? '#f43f5e' : '#06b6d4'; // Rose-500 or Cyan-500
+      
       ctx.lineWidth = 2;
-      ctx.strokeStyle = onCooldown ? 'rgba(255, 165, 0, 0.6)' : 'rgba(0, 255, 255, 0.6)';
-      ctx.fillStyle = onCooldown ? 'rgba(255, 165, 0, 0.1)' : 'rgba(0, 255, 255, 0.05)';
+      ctx.strokeStyle = onCooldown ? 'rgba(244, 63, 94, 0.8)' : 'rgba(6, 182, 212, 0.8)';
+      ctx.fillStyle = onCooldown ? 'rgba(244, 63, 94, 0.1)' : 'rgba(6, 182, 212, 0.05)';
       
       ctx.strokeRect(sampleX, sampleY, zoneW, zoneH);
       ctx.fillRect(sampleX, sampleY, zoneW, zoneH);
+      ctx.shadowBlur = 0;
 
-      // 4. Motion Logic
-      if (isMonitoring) {
-        // Get image data for the zone
-        const imageData = ctx.getImageData(sampleX, sampleY, zoneW, zoneH);
-        const data = imageData.data;
+      // 5. Motion Logic processing
+      if (isMonitoring && currentFrameData) {
+        const data = currentFrameData;
         
         let diffScore = 0;
         let pixelsChecked = 0;
 
         if (prevPixelDataRef.current && prevPixelDataRef.current.length === data.length) {
           const prevData = prevPixelDataRef.current;
-          
-          // Adaptive sampling based on area size to keep CPU usage low
           const skip = data.length > 50000 ? 16 : 4; 
           
           for (let i = 0; i < data.length; i += skip * 4) {
@@ -140,7 +147,6 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
           const normalizedDiff = diffScore / pixelsChecked; 
           setDebugDiff(normalizedDiff);
 
-          // Threshold calculation: Sensitivity 1-100 maps to high-low threshold
           const threshold = 105 - settings.sensitivity; 
 
           if (normalizedDiff > threshold && !onCooldown) {
@@ -148,13 +154,13 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
             lastTriggerRef.current = now;
             onMotionTriggered(now);
             
-            // Visual Flash on Trigger
-            ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
+            // Visual Flash on Trigger (Cyan flash)
+            // This is drawn at end of frame, will be cleared by next frame's video draw
+            ctx.fillStyle = 'rgba(6, 182, 212, 0.3)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
           }
         }
 
-        // Store current zone pixels for next comparison
         prevPixelDataRef.current = new Uint8ClampedArray(data);
       } else {
         prevPixelDataRef.current = null;
@@ -171,9 +177,9 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
   }, [settings, isMonitoring, onMotionTriggered]);
 
   return (
-    <div className="w-full h-full bg-black relative flex items-center justify-center">
+    <div className="w-full h-full bg-slate-950 relative flex items-center justify-center">
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-50 text-red-500 p-4 text-center">
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-950 z-50 text-rose-500 p-4 text-center">
           <p>{error}</p>
         </div>
       )}
@@ -183,7 +189,7 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
       <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" />
 
       {/* Debug Info Overlay */}
-      <div className="absolute bottom-4 left-4 text-[10px] text-green-400 font-mono opacity-50 pointer-events-none">
+      <div className="absolute bottom-4 left-4 text-[10px] text-cyan-400/50 font-mono pointer-events-none">
         DIFF: {debugDiff.toFixed(2)} | STATE: {isMonitoring ? 'RUNNING' : 'STOPPED'}
       </div>
     </div>
