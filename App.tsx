@@ -158,13 +158,8 @@ export default function App() {
       {!isDisplayMode && (
         <header className="flex-none h-16 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-6 z-20">
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-tr from-cyan-500 to-blue-600 p-2 rounded-lg shadow-lg shadow-cyan-500/20">
-              <Activity size={20} className="text-white" />
-            </div>
-            <div>
-              <h1 className="font-bold tracking-wide uppercase text-sm md:text-base text-white">LapTrack AI</h1>
-              <span className="text-[10px] text-slate-500 font-medium tracking-wider uppercase block -mt-0.5">Motion Timer</span>
-            </div>
+            <img src="/icon-192.png" alt="LapTracker" className="w-10 h-10 rounded-xl shadow-lg" />
+            <h1 className="font-bold tracking-wide text-lg bg-gradient-to-r from-white to-blue-400 bg-clip-text text-transparent">LapTracker</h1>
           </div>
           <div className="flex items-center gap-4">
             {laps.length > 0 && (

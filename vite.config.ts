@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
           },
           includeAssets: ['apple-touch-icon.png'],
           manifest: {
-            name: 'LapTrack AI',
+            name: 'LapTracker',
             short_name: 'LapTrack',
             description: 'Motion-based lap timer with AI-powered detection',
             theme_color: '#0f172a',
