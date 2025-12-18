@@ -12,9 +12,15 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
+  
+  // Logic Refs
   const lastTriggerRef = useRef<number>(0);
   
+  // FPS Counting Refs
+  const lastFpsTimeRef = useRef<number>(0);
+  const frameCountRef = useRef<number>(0);
+  const [fps, setFps] = useState<number>(0);
+
   // Previous frame data for difference calculation
   const prevPixelDataRef = useRef<Uint8ClampedArray | null>(null);
   
@@ -27,8 +33,9 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { 
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 640 },
+            height: { ideal: 360 },
+            frameRate: { ideal: 60 },
             facingMode: 'environment' 
           }, 
           audio: false 
@@ -55,21 +62,32 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
-      if (animationFrameRef.current !== null) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
     };
   }, []);
 
   // Motion Detection Loop
   useEffect(() => {
+    let rafId: number | null = null;
+    let rvfcId: number | null = null;
+
     const processFrame = () => {
+      const now = Date.now();
+      
+      // Calculate FPS
+      frameCountRef.current++;
+      if (now - lastFpsTimeRef.current >= 1000) {
+        setFps(frameCountRef.current);
+        frameCountRef.current = 0;
+        lastFpsTimeRef.current = now;
+      }
+
       const video = videoRef.current;
       const canvas = canvasRef.current;
       
-      if (!video || !canvas || video.readyState !== 4) {
-        animationFrameRef.current = requestAnimationFrame(processFrame);
-        return;
+      // Safety Check: If video isn't ready, fallback to RAF to retry next frame
+      if (!video || !canvas || video.readyState < 2) {
+         rafId = requestAnimationFrame(processFrame);
+         return;
       }
 
       if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
@@ -77,8 +95,16 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
         canvas.height = video.videoHeight;
       }
 
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      if (!ctx) return;
+      // Optimization: alpha: false removes the transparency channel, speeding up compositing
+      const ctx = canvas.getContext('2d', { 
+        willReadFrequently: true,
+        alpha: false 
+      });
+      
+      if (!ctx) {
+         rafId = requestAnimationFrame(processFrame);
+         return;
+      }
 
       // 1. Draw the current frame
       ctx.filter = 'none';
@@ -94,7 +120,6 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
       const sampleY = Math.max(0, Math.min(canvas.height - zoneH, centerY - zoneH / 2));
 
       // 2. Monitoring visual effect (blur)
-      // We apply this before capturing data so we detect on the blurred image (reduces noise)
       if (isMonitoring) {
         ctx.filter = 'blur(4px)'; 
         ctx.drawImage(video, sampleX, sampleY, zoneW, zoneH, sampleX, sampleY, zoneW, zoneH);
@@ -102,15 +127,12 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
       }
 
       // 3. CAPTURE DATA FOR MOTION DETECTION
-      // Critical: Capture BEFORE drawing any overlays (boxes, text, etc.) to prevent feedback loops.
       let currentFrameData: Uint8ClampedArray | null = null;
       if (isMonitoring) {
         currentFrameData = ctx.getImageData(sampleX, sampleY, zoneW, zoneH).data;
       }
 
-      // 4. Draw Zone Overlay Box (Neon Style)
-      // These overlays change color based on state, so they must happen AFTER capture.
-      const now = Date.now();
+      // 4. Draw Zone Overlay Box
       const onCooldown = now - lastTriggerRef.current < settings.cooldown;
       
       ctx.shadowBlur = 10;
@@ -154,8 +176,6 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
             lastTriggerRef.current = now;
             onMotionTriggered(now);
             
-            // Visual Flash on Trigger (Cyan flash)
-            // This is drawn at end of frame, will be cleared by next frame's video draw
             ctx.fillStyle = 'rgba(6, 182, 212, 0.3)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
           }
@@ -166,18 +186,32 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
         prevPixelDataRef.current = null;
       }
 
-      animationFrameRef.current = requestAnimationFrame(processFrame);
+      // Schedule next frame
+      // CRITICAL: We prioritize requestVideoFrameCallback to sync with the CAMERA FPS (e.g. 60Hz)
+      // instead of the monitor refresh rate (e.g. 75Hz). This avoids processing duplicate frames.
+      if ('requestVideoFrameCallback' in video) {
+        rvfcId = (video as any).requestVideoFrameCallback(processFrame);
+      } else {
+        rafId = requestAnimationFrame(processFrame);
+      }
     };
 
-    animationFrameRef.current = requestAnimationFrame(processFrame);
+    // Kickoff
+    rafId = requestAnimationFrame(processFrame);
 
     return () => {
-      if (animationFrameRef.current !== null) cancelAnimationFrame(animationFrameRef.current);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      if (rvfcId !== null && videoRef.current && 'cancelVideoFrameCallback' in videoRef.current) {
+        (videoRef.current as any).cancelVideoFrameCallback(rvfcId);
+      }
     };
   }, [settings, isMonitoring, onMotionTriggered]);
 
   return (
-    <div className="w-full h-full bg-slate-950 relative flex items-center justify-center">
+    <div 
+      className="w-full h-full bg-slate-950 relative flex items-center justify-center"
+      style={{ transform: 'translate3d(0,0,0)', backfaceVisibility: 'hidden' }}
+    >
       {error && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-950 z-50 text-rose-500 p-4 text-center">
           <p>{error}</p>
@@ -186,12 +220,23 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
       
       <video ref={videoRef} className="hidden" playsInline muted />
       
-      <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" />
+      <canvas 
+        ref={canvasRef} 
+        className="max-w-full max-h-full object-contain"
+        style={{ transform: 'translate3d(0,0,0)' }} 
+      />
 
-      {/* Debug Info Overlay */}
-      <div className="absolute bottom-4 left-4 text-[10px] text-cyan-400/50 font-mono pointer-events-none">
-        DIFF: {debugDiff.toFixed(2)} | STATE: {isMonitoring ? 'RUNNING' : 'STOPPED'}
-      </div>
+      {/* Debug Info Overlay - Conditional on devMode */}
+      {settings.devMode && (
+        <div className="absolute bottom-4 left-4 flex flex-col items-start gap-1 pointer-events-none z-20">
+            <div className="text-[10px] text-cyan-400/80 font-mono bg-slate-950/70 px-2 py-1 rounded">
+                FPS: {fps}
+            </div>
+            <div className="text-[10px] text-cyan-400/50 font-mono bg-slate-950/50 px-2 py-1 rounded">
+                DIFF: {debugDiff.toFixed(2)} | STATE: {isMonitoring ? 'RUNNING' : 'STOPPED'}
+            </div>
+        </div>
+      )}
     </div>
   );
 }

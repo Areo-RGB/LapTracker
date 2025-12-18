@@ -5,7 +5,8 @@ export interface AppSettings {
   detectionHeight: number; // Percentage 1-100
   sensitivity: number; // 0-100, where lower is more sensitive (threshold)
   cooldown: number; // milliseconds
-  showTimerOverlay: boolean;
+  devMode: boolean; // Replaces showTimerOverlay
+  showCurrentLapDisplay: boolean;
   targetLaps: number; // 0 for infinite, >0 for target
 }
 

@@ -1,91 +1,58 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { AppSettings } from '../types';
-import { Play, Pause, Sliders, Monitor, Trash2, BoxSelect, GripHorizontal, Target } from 'lucide-react';
+import { Sliders, Monitor, BoxSelect, Target, X, Check, Code } from 'lucide-react';
 
 interface ConfigTabProps {
   settings: AppSettings;
   setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
-  isMonitoring: boolean;
-  toggleMonitoring: () => void;
-  resetLaps: () => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-export default function ConfigTab({ settings, setSettings, isMonitoring, toggleMonitoring, resetLaps }: ConfigTabProps) {
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStartPos = useRef({ x: 0, y: 0 });
-  const panelRef = useRef<HTMLDivElement>(null);
+export default function ConfigTab({ settings, setSettings, isOpen, onClose }: ConfigTabProps) {
+  if (!isOpen) return null;
 
   const updateSetting = (key: keyof AppSettings, value: number | boolean) => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
-  // Dragging Logic
-  const handlePointerDown = (e: React.PointerEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('.drag-handle')) {
-      setIsDragging(true);
-      dragStartPos.current = {
-        x: e.clientX - position.x,
-        y: e.clientY - position.y
-      };
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    }
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging) return;
-    const newX = e.clientX - dragStartPos.current.x;
-    const newY = e.clientY - dragStartPos.current.y;
-    setPosition({ x: newX, y: newY });
-  };
-
-  const handlePointerUp = (e: React.PointerEvent) => {
-    setIsDragging(false);
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-  };
-
   return (
-    <div className="w-full h-full pointer-events-none relative flex items-center justify-center overflow-hidden">
-      
-      <div 
-        ref={panelRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        style={{ 
-          transform: `translate(${position.x}px, ${position.y}px)`,
-          touchAction: 'none'
-        }}
-        className={`bg-slate-900/90 backdrop-blur-xl rounded-3xl border border-slate-700/50 shadow-2xl max-w-md w-full pointer-events-auto transition-all duration-200 ${isDragging ? 'shadow-cyan-500/10 cursor-grabbing scale-[1.01]' : 'shadow-black/50'}`}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-6 animate-in fade-in duration-200">
+      <div className="bg-slate-900/95 border border-slate-700 shadow-2xl rounded-3xl w-full max-w-sm overflow-hidden flex flex-col max-h-[85vh]">
         
-        <div className="drag-handle w-full flex flex-col items-center pt-3 pb-2 cursor-grab active:cursor-grabbing border-b border-slate-800">
-          <div className="w-12 h-1 bg-slate-700 rounded-full mb-3" />
-          <div className="flex items-center gap-2.5 text-cyan-400 px-6 pb-2 w-full">
-            <Sliders size={18} className="drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
-            <h2 className="text-xs font-bold uppercase tracking-widest flex-1 text-slate-200">Detection Settings</h2>
-            <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${isMonitoring ? 'bg-emerald-400 text-emerald-400 animate-pulse' : 'bg-rose-500 text-rose-500'}`} />
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+          <div className="flex items-center gap-2 text-cyan-400">
+            <Sliders size={20} className="drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
+            <h2 className="font-bold uppercase tracking-wider text-sm text-slate-200">Settings</h2>
           </div>
+          <button 
+            onClick={onClose}
+            className="p-2 -mr-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto no-scrollbar">
+        {/* Content */}
+        <div className="p-6 space-y-8 overflow-y-auto no-scrollbar">
+          
           {/* Zone Geometry Group */}
-          <div className="space-y-4 p-5 bg-slate-950/40 rounded-2xl border border-slate-800/50 shadow-inner">
+          <div className="space-y-4">
             <div className="flex items-center gap-2 text-slate-400 mb-2">
               <BoxSelect size={14} />
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Zone Geometry</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+            <div className="grid grid-cols-1 gap-5">
               {[
-                { label: 'Horiz Pos', key: 'tripwireX', max: 100 },
-                { label: 'Vert Pos', key: 'tripwireY', max: 100 },
-                { label: 'Width', key: 'detectionWidth', max: 50, min: 1 },
-                { label: 'Height', key: 'detectionHeight', max: 100, min: 1 },
+                { label: 'Horizontal Position', key: 'tripwireX', max: 100 },
+                { label: 'Vertical Position', key: 'tripwireY', max: 100 },
+                { label: 'Detection Width', key: 'detectionWidth', max: 50, min: 1 },
+                { label: 'Detection Height', key: 'detectionHeight', max: 100, min: 1 },
               ].map((item) => (
                 <div className="space-y-2.5" key={item.key}>
-                  <div className="flex justify-between text-[10px] font-mono font-medium text-slate-400">
+                  <div className="flex justify-between text-[11px] font-mono font-medium text-slate-400">
                     <span>{item.label}</span>
                     <span className="text-cyan-400/80">{settings[item.key as keyof AppSettings]}%</span>
                   </div>
@@ -100,31 +67,11 @@ export default function ConfigTab({ settings, setSettings, isMonitoring, toggleM
             </div>
           </div>
 
-          {/* Session Logic */}
-          <div className="p-5 bg-slate-950/40 rounded-2xl border border-slate-800/50 shadow-inner space-y-4">
-             <div className="flex items-center gap-2 text-slate-400 mb-1">
-              <Target size={14} />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Session Config</span>
-            </div>
-            
-            <div className="flex items-center justify-between gap-4">
-              <label className="text-xs font-mono text-slate-400 whitespace-nowrap">Target Laps (0=∞)</label>
-              <input 
-                type="number"
-                min="0"
-                max="999"
-                value={settings.targetLaps}
-                onChange={(e) => updateSetting('targetLaps', Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-20 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-right text-cyan-400 font-mono text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all shadow-sm"
-              />
-            </div>
-          </div>
-
           {/* Sensitivity & Performance */}
-          <div className="space-y-5 px-1">
+          <div className="space-y-5 border-t border-slate-800/80 pt-6">
             <div className="space-y-2.5">
-              <div className="flex justify-between text-xs font-mono text-slate-400">
-                <span>Sensitivity</span>
+              <div className="flex justify-between text-[11px] font-mono font-medium text-slate-400">
+                <span>Motion Sensitivity</span>
                 <span className="text-cyan-400/80">{settings.sensitivity}%</span>
               </div>
               <input
@@ -134,8 +81,8 @@ export default function ConfigTab({ settings, setSettings, isMonitoring, toggleM
               />
             </div>
             <div className="space-y-2.5">
-              <div className="flex justify-between text-xs font-mono text-slate-400">
-                <span>Cooldown</span>
+              <div className="flex justify-between text-[11px] font-mono font-medium text-slate-400">
+                <span>Trigger Cooldown</span>
                 <span className="text-cyan-400/80">{settings.cooldown}ms</span>
               </div>
               <input
@@ -146,52 +93,71 @@ export default function ConfigTab({ settings, setSettings, isMonitoring, toggleM
             </div>
           </div>
 
-          <div className="space-y-3 pt-4 border-t border-slate-800/80">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-slate-400">
-                <Monitor size={16} />
-                <span className="text-xs font-mono">Timer Overlay</span>
-              </div>
-              <button
-                onClick={() => updateSetting('showTimerOverlay', !settings.showTimerOverlay)}
-                className={`w-12 h-7 flex items-center rounded-full p-1 transition-all duration-300 ${
-                  settings.showTimerOverlay ? 'bg-cyan-500/90 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 border border-slate-700'
-                }`}
-              >
-                <div className={`bg-white w-5 h-5 rounded-full shadow-sm transform transition-transform duration-300 ${settings.showTimerOverlay ? 'translate-x-5' : 'translate-x-0'}`} />
-              </button>
+          {/* Session Logic */}
+           <div className="space-y-4 border-t border-slate-800/80 pt-6">
+             <div className="flex items-center gap-2 text-slate-400 mb-1">
+              <Target size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Session Targets</span>
             </div>
-            <div className="flex items-center justify-between border-t border-slate-800/80 pt-4">
-              <div className="flex items-center gap-2 text-slate-400">
-                  <Trash2 size={16} />
-                  <span className="text-xs font-mono">Lap History</span>
-              </div>
-              <button
-                  onClick={resetLaps}
-                  className="px-5 py-2 bg-slate-800 hover:bg-rose-950/40 text-slate-300 hover:text-rose-400 border border-slate-700 hover:border-rose-900/60 rounded-xl text-xs font-bold transition-all uppercase hover:shadow-lg hover:shadow-rose-900/10"
-              >
-                  Reset
-              </button>
+            
+            <div className="flex items-center justify-between gap-4">
+              <label className="text-xs font-mono text-slate-400 whitespace-nowrap">Target Lap Count</label>
+              <input 
+                type="number"
+                min="0"
+                max="999"
+                value={settings.targetLaps}
+                onChange={(e) => updateSetting('targetLaps', Math.max(0, parseInt(e.target.value) || 0))}
+                className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-right text-cyan-400 font-mono text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all shadow-sm"
+              />
             </div>
           </div>
 
-          <button
-            onClick={toggleMonitoring}
-            className={`w-full py-4 rounded-xl font-bold uppercase tracking-wider flex items-center justify-center gap-3 transition-all duration-300 shadow-lg ${
-              isMonitoring 
-                ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/50 shadow-rose-900/10' 
-                : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 border border-cyan-400/20 shadow-cyan-500/20'
-            }`}
+          <div className="space-y-4 pt-6 border-t border-slate-800/80">
+            <div className="flex items-center gap-2 text-slate-400 mb-1">
+              <Monitor size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Display Options</span>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                  <Code size={14} />
+                  <span>Developer Mode (FPS + Overlay)</span>
+                </div>
+                <button
+                  onClick={() => updateSetting('devMode', !settings.devMode)}
+                  className={`w-12 h-7 flex items-center rounded-full p-1 transition-all duration-300 ${
+                    settings.devMode ? 'bg-cyan-500/90 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 border border-slate-700'
+                  }`}
+                >
+                  <div className={`bg-white w-5 h-5 rounded-full shadow-sm transform transition-transform duration-300 ${settings.devMode ? 'translate-x-5' : 'translate-x-0'}`} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono text-slate-400">Big Screen: Live Lap</span>
+                <button
+                  onClick={() => updateSetting('showCurrentLapDisplay', !settings.showCurrentLapDisplay)}
+                  className={`w-12 h-7 flex items-center rounded-full p-1 transition-all duration-300 ${
+                    settings.showCurrentLapDisplay ? 'bg-cyan-500/90 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 border border-slate-700'
+                  }`}
+                >
+                  <div className={`bg-white w-5 h-5 rounded-full shadow-sm transform transition-transform duration-300 ${settings.showCurrentLapDisplay ? 'translate-x-5' : 'translate-x-0'}`} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-slate-800 bg-slate-900/50">
+          <button 
+            onClick={onClose}
+            className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 uppercase tracking-wider text-sm shadow-lg shadow-cyan-900/20"
           >
-            {isMonitoring ? (
-              <>
-                <Pause size={20} className="fill-current" /> Stop Detection
-              </>
-            ) : (
-              <>
-                <Play size={20} className="fill-current" /> Start Detection
-              </>
-            )}
+            <Check size={18} /> Done
           </button>
         </div>
       </div>

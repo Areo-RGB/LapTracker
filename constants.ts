@@ -5,7 +5,8 @@ export const DEFAULT_SETTINGS = {
   detectionHeight: 15,
   sensitivity: 25,
   cooldown: 1000,
-  showTimerOverlay: false,
+  devMode: false,
+  showCurrentLapDisplay: false,
   targetLaps: 0,
 };
 

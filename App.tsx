@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Settings, Timer, Activity, Trash2, Camera } from 'lucide-react';
+import { Settings, Timer, Activity, Trash2, Play, Pause } from 'lucide-react';
 import { Tab, Lap, AppSettings } from './types';
 import { DEFAULT_SETTINGS } from './constants';
 import MotionEngine from './components/MotionEngine';
@@ -56,6 +56,7 @@ export default function App() {
   const [laps, setLaps] = useState<Lap[]>([]);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [lastActivity, setLastActivity] = useState<number>(0);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Core logic to record a lap
   const handleMotionTriggered = useCallback((timestamp: number) => {
@@ -198,7 +199,8 @@ export default function App() {
             lastActivityTimestamp={lastActivity}
            />
            
-           {settings.showTimerOverlay && (
+           {/* Tied to Dev Mode now */}
+           {settings.devMode && (
              <TimerOverlay 
                isMonitoring={isMonitoring} 
                lastActivity={lastActivity}
@@ -206,15 +208,43 @@ export default function App() {
              />
            )}
 
+           {/* Controls Layer */}
            <div className="absolute inset-0 z-10 pointer-events-none">
-             <ConfigTab 
-               settings={settings} 
-               setSettings={setSettings} 
-               isMonitoring={isMonitoring} 
-               toggleMonitoring={toggleMonitoring}
-               resetLaps={resetLaps}
-             />
+              {/* Settings Button - Top Right */}
+              <div className="absolute top-4 right-4 pointer-events-auto">
+                <button 
+                  onClick={() => setShowSettings(true)}
+                  className="p-3 bg-slate-900/80 text-slate-300 hover:text-cyan-400 backdrop-blur-md rounded-full border border-slate-700/50 shadow-xl hover:bg-slate-800 hover:border-cyan-500/30 transition-all duration-300 group"
+                  title="Configure Settings"
+                >
+                  <Settings size={22} className="group-hover:rotate-90 transition-transform duration-500" />
+                </button>
+              </div>
+
+              {/* Start/Stop Button - Bottom Center */}
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-auto">
+                <button
+                  onClick={toggleMonitoring}
+                  className={`flex items-center gap-3 pl-6 pr-8 py-4 rounded-full font-bold uppercase tracking-wider shadow-2xl transition-all duration-300 transform active:scale-95 group ${
+                    isMonitoring 
+                      ? 'bg-rose-500/90 text-white shadow-[0_0_25px_rgba(244,63,94,0.4)] hover:bg-rose-500 border border-rose-400/50' 
+                      : 'bg-cyan-500/90 text-white shadow-[0_0_25px_rgba(6,182,212,0.4)] hover:bg-cyan-500 border border-cyan-400/50'
+                  }`}
+                >
+                  <div className={`p-1 rounded-full ${isMonitoring ? 'bg-rose-700/30' : 'bg-cyan-700/30'}`}>
+                     {isMonitoring ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
+                  </div>
+                  <span className="text-sm">{isMonitoring ? 'Stop Detection' : 'Start Detection'}</span>
+                </button>
+              </div>
            </div>
+
+           <ConfigTab 
+             settings={settings} 
+             setSettings={setSettings} 
+             isOpen={showSettings}
+             onClose={() => setShowSettings(false)}
+           />
         </div>
 
         {activeTab === Tab.DISPLAY && (
@@ -225,7 +255,9 @@ export default function App() {
               isMonitoring={isMonitoring} 
               toggleMonitoring={toggleMonitoring}
               onExit={handleExitDisplay}
+              onReset={resetLaps}
               lastActivity={lastActivity}
+              settings={settings}
             />
           </div>
         )}
@@ -237,8 +269,8 @@ export default function App() {
             onClick={() => setActiveTab(Tab.CONFIG)}
             className={`flex-1 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all duration-300 ${activeTab === Tab.CONFIG ? 'bg-slate-900 text-cyan-400 border border-slate-800 shadow-lg shadow-black/50' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-900/50'}`}
           >
-            <Settings size={22} className={activeTab === Tab.CONFIG ? 'drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : ''} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Config</span>
+            <Activity size={22} className={activeTab === Tab.CONFIG ? 'drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : ''} />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Monitor</span>
           </button>
           <button
             onClick={handleEnterDisplay}
