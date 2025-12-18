@@ -184,6 +184,28 @@ export default function App() {
         </header>
       )}
 
+      {/* Tab Selection - Under Header */}
+      {!isDisplayMode && (
+        <div className="flex-none bg-slate-950 border-b border-slate-800/50 px-4 py-2 z-20">
+          <div className="flex items-center gap-1 bg-slate-900/80 rounded-lg p-1">
+            <button
+              onClick={() => setActiveTab(Tab.CONFIG)}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-xs font-semibold uppercase tracking-wide transition-all duration-200 ${activeTab === Tab.CONFIG ? 'bg-slate-800 text-cyan-400 shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+              <Activity size={16} className={activeTab === Tab.CONFIG ? 'drop-shadow-[0_0_6px_rgba(34,211,238,0.5)]' : ''} />
+              Monitor
+            </button>
+            <button
+              onClick={handleEnterDisplay}
+              className="flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-xs font-semibold uppercase tracking-wide transition-all duration-200 text-slate-500 hover:text-slate-300"
+            >
+              <Timer size={16} />
+              Display
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 relative overflow-hidden flex flex-col bg-slate-950">
 
         <div className={`absolute inset-0 z-0 ${activeTab === Tab.CONFIG ? 'visible' : 'invisible pointer-events-none opacity-0'}`}>
@@ -255,24 +277,7 @@ export default function App() {
         )}
       </main>
 
-      {!isDisplayMode && (
-        <nav className="flex-none h-16 bg-slate-900/50 backdrop-blur-sm border-t border-slate-800/50 flex items-center z-30 px-4 gap-2">
-          <button
-            onClick={() => setActiveTab(Tab.CONFIG)}
-            className={`flex-1 h-12 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 ${activeTab === Tab.CONFIG ? 'bg-slate-800 text-cyan-400' : 'text-slate-500 hover:text-slate-300'}`}
-          >
-            <Activity size={18} className={activeTab === Tab.CONFIG ? 'drop-shadow-[0_0_6px_rgba(34,211,238,0.5)]' : ''} />
-            <span className="text-xs font-semibold uppercase tracking-wide">Monitor</span>
-          </button>
-          <button
-            onClick={handleEnterDisplay}
-            className="flex-1 h-12 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 text-slate-500 hover:text-slate-300"
-          >
-            <Timer size={18} />
-            <span className="text-xs font-semibold uppercase tracking-wide">Display</span>
-          </button>
-        </nav>
-      )}
+
 
     </div>
   );
