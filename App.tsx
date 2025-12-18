@@ -7,18 +7,21 @@ import DisplayTab from './components/DisplayTab';
 import ConfigTab from './components/ConfigTab';
 
 // Internal Component for the Live Timer Overlay
+// Uses direct DOM manipulation for 60fps performance (avoids React re-renders)
 const TimerOverlay = ({ isMonitoring, lastActivity, hasLaps }: { isMonitoring: boolean, lastActivity: number, hasLaps: boolean }) => {
-  const [time, setTime] = useState(0);
+  const displayRef = React.useRef<HTMLSpanElement>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isMonitoring || !hasLaps || lastActivity === 0) {
-       setTime(0);
-       return;
+      if (displayRef.current) displayRef.current.textContent = '0.00';
+      return;
     }
-    
+
     let frameId: number;
     const update = () => {
-      setTime(Date.now() - lastActivity);
+      if (displayRef.current) {
+        displayRef.current.textContent = ((Date.now() - lastActivity) / 1000).toFixed(2);
+      }
       frameId = requestAnimationFrame(update);
     };
     update();
@@ -27,22 +30,21 @@ const TimerOverlay = ({ isMonitoring, lastActivity, hasLaps }: { isMonitoring: b
 
   return (
     <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none">
-      <div className={`px-4 py-3 rounded-xl backdrop-blur-md border shadow-2xl transition-all duration-300 ${
-        !isMonitoring 
-          ? 'bg-slate-900/80 border-slate-700/50' 
-          : !hasLaps 
-            ? 'bg-amber-900/40 border-amber-700/30' 
+      <div className={`px-4 py-3 rounded-xl backdrop-blur-md border shadow-2xl transition-all duration-300 ${!isMonitoring
+          ? 'bg-slate-900/80 border-slate-700/50'
+          : !hasLaps
+            ? 'bg-amber-900/40 border-amber-700/30'
             : 'bg-slate-900/80 border-cyan-500/30 shadow-cyan-500/10'
-      }`}>
+        }`}>
         <div className="flex items-center gap-2.5 mb-1.5">
           <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${isMonitoring ? 'bg-emerald-400 text-emerald-400 animate-pulse' : 'bg-rose-500 text-rose-500'}`} />
           <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
             {!isMonitoring ? 'OFFLINE' : !hasLaps ? 'READY' : 'CURRENT LAP'}
           </span>
         </div>
-        
+
         <div className="font-mono text-3xl font-bold tabular-nums text-white leading-none tracking-tight drop-shadow-lg">
-          {(time / 1000).toFixed(2)}
+          <span ref={displayRef}>0.00</span>
           <span className="text-sm text-slate-500 ml-1 font-sans font-medium">s</span>
         </div>
       </div>
@@ -64,7 +66,7 @@ export default function App() {
     setLaps((prevLaps) => {
       const lastLap = prevLaps[prevLaps.length - 1];
       let duration = 0;
-      
+
       if (lastLap) {
         duration = timestamp - lastLap.timestamp;
       }
@@ -98,7 +100,7 @@ export default function App() {
     } else {
       const completedLaps = laps.filter(l => l.duration > 0).length;
       const isFinished = settings.targetLaps > 0 && completedLaps >= settings.targetLaps;
-      
+
       setIsMonitoring(true);
 
       // If starting fresh (no laps or previous session finished), trigger the timer start immediately
@@ -136,7 +138,7 @@ export default function App() {
     const count = validLaps.length;
 
     if (count === 0) return { average: 0, count: 0, last: 0, fastest: 0, slowest: 0, isFinished: false, targetLaps: settings.targetLaps };
-    
+
     const durations = validLaps.map(l => l.duration);
     const totalTime = durations.reduce((acc, curr) => acc + curr, 0);
     const average = totalTime / count;
@@ -152,7 +154,7 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden font-sans selection:bg-cyan-500/30">
-      
+
       {!isDisplayMode && (
         <header className="flex-none h-16 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-6 z-20">
           <div className="flex items-center gap-3">
@@ -166,13 +168,13 @@ export default function App() {
           </div>
           <div className="flex items-center gap-4">
             {laps.length > 0 && (
-               <button 
-               onClick={resetLaps}
-               className="p-2.5 text-rose-400 hover:bg-rose-950/30 hover:text-rose-300 rounded-full transition-all border border-transparent hover:border-rose-900/50"
-               title="Reset Laps"
-             >
-               <Trash2 size={18} />
-             </button>
+              <button
+                onClick={resetLaps}
+                className="p-2.5 text-rose-400 hover:bg-rose-950/30 hover:text-rose-300 rounded-full transition-all border border-transparent hover:border-rose-900/50"
+                title="Reset Laps"
+              >
+                <Trash2 size={18} />
+              </button>
             )}
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono font-bold border transition-all duration-500 ${isMonitoring ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)]' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>
               <div className={`w-2 h-2 rounded-full ${isMonitoring ? 'bg-emerald-400 animate-pulse shadow-[0_0_8px_currentColor]' : 'bg-slate-500'}`}></div>
@@ -184,75 +186,74 @@ export default function App() {
 
       <main className="flex-1 relative overflow-hidden flex flex-col bg-slate-950">
         {/* Background Grid Pattern */}
-        <div className="absolute inset-0 opacity-10 pointer-events-none" 
-             style={{ 
-               backgroundImage: `radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.15) 1px, transparent 0)`,
-               backgroundSize: '40px 40px' 
-             }} 
+        <div className="absolute inset-0 opacity-10 pointer-events-none"
+          style={{
+            backgroundImage: `radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.15) 1px, transparent 0)`,
+            backgroundSize: '40px 40px'
+          }}
         />
 
         <div className={`absolute inset-0 z-0 ${activeTab === Tab.CONFIG ? 'visible' : 'invisible pointer-events-none opacity-0'}`}>
-           <MotionEngine 
+          <MotionEngine
             settings={settings}
             onMotionTriggered={handleMotionTriggered}
             isMonitoring={isMonitoring}
             lastActivityTimestamp={lastActivity}
-           />
-           
-           {/* Tied to Dev Mode now */}
-           {settings.devMode && (
-             <TimerOverlay 
-               isMonitoring={isMonitoring} 
-               lastActivity={lastActivity}
-               hasLaps={laps.length > 0} 
-             />
-           )}
+          />
 
-           {/* Controls Layer */}
-           <div className="absolute inset-0 z-10 pointer-events-none">
-              {/* Settings Button - Top Right */}
-              <div className="absolute top-4 right-4 pointer-events-auto">
-                <button 
-                  onClick={() => setShowSettings(true)}
-                  className="p-3 bg-slate-900/80 text-slate-300 hover:text-cyan-400 backdrop-blur-md rounded-full border border-slate-700/50 shadow-xl hover:bg-slate-800 hover:border-cyan-500/30 transition-all duration-300 group"
-                  title="Configure Settings"
-                >
-                  <Settings size={22} className="group-hover:rotate-90 transition-transform duration-500" />
-                </button>
-              </div>
+          {/* Tied to Dev Mode now */}
+          {settings.devMode && (
+            <TimerOverlay
+              isMonitoring={isMonitoring}
+              lastActivity={lastActivity}
+              hasLaps={laps.length > 0}
+            />
+          )}
 
-              {/* Start/Stop Button - Bottom Center */}
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-auto">
-                <button
-                  onClick={toggleMonitoring}
-                  className={`flex items-center gap-3 pl-6 pr-8 py-4 rounded-full font-bold uppercase tracking-wider shadow-2xl transition-all duration-300 transform active:scale-95 group ${
-                    isMonitoring 
-                      ? 'bg-rose-500/90 text-white shadow-[0_0_25px_rgba(244,63,94,0.4)] hover:bg-rose-500 border border-rose-400/50' 
-                      : 'bg-cyan-500/90 text-white shadow-[0_0_25px_rgba(6,182,212,0.4)] hover:bg-cyan-500 border border-cyan-400/50'
+          {/* Controls Layer */}
+          <div className="absolute inset-0 z-10 pointer-events-none">
+            {/* Settings Button - Top Right */}
+            <div className="absolute top-4 right-4 pointer-events-auto">
+              <button
+                onClick={() => setShowSettings(true)}
+                className="p-3 bg-slate-900/80 text-slate-300 hover:text-cyan-400 backdrop-blur-md rounded-full border border-slate-700/50 shadow-xl hover:bg-slate-800 hover:border-cyan-500/30 transition-all duration-300 group"
+                title="Configure Settings"
+              >
+                <Settings size={22} className="group-hover:rotate-90 transition-transform duration-500" />
+              </button>
+            </div>
+
+            {/* Start/Stop Button - Bottom Center */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-auto">
+              <button
+                onClick={toggleMonitoring}
+                className={`flex items-center gap-3 pl-6 pr-8 py-4 rounded-full font-bold uppercase tracking-wider shadow-2xl transition-all duration-300 transform active:scale-95 group ${isMonitoring
+                    ? 'bg-rose-500/90 text-white shadow-[0_0_25px_rgba(244,63,94,0.4)] hover:bg-rose-500 border border-rose-400/50'
+                    : 'bg-cyan-500/90 text-white shadow-[0_0_25px_rgba(6,182,212,0.4)] hover:bg-cyan-500 border border-cyan-400/50'
                   }`}
-                >
-                  <div className={`p-1 rounded-full ${isMonitoring ? 'bg-rose-700/30' : 'bg-cyan-700/30'}`}>
-                     {isMonitoring ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
-                  </div>
-                  <span className="text-sm">{isMonitoring ? 'Stop Detection' : 'Start Detection'}</span>
-                </button>
-              </div>
-           </div>
+              >
+                <div className={`p-1 rounded-full ${isMonitoring ? 'bg-rose-700/30' : 'bg-cyan-700/30'}`}>
+                  {isMonitoring ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
+                </div>
+                <span className="text-sm">{isMonitoring ? 'Stop Detection' : 'Start Detection'}</span>
+              </button>
+            </div>
+          </div>
 
-           <ConfigTab 
-             settings={settings} 
-             setSettings={setSettings} 
-             isOpen={showSettings}
-             onClose={() => setShowSettings(false)}
-           />
+          <ConfigTab
+            settings={settings}
+            setSettings={setSettings}
+            isOpen={showSettings}
+            onClose={() => setShowSettings(false)}
+          />
         </div>
 
         {activeTab === Tab.DISPLAY && (
           <div className="absolute inset-0 z-20 bg-slate-950">
-            <DisplayTab 
-              stats={stats} 
-              laps={laps} 
-              isMonitoring={isMonitoring} 
+            <DisplayTab
+              stats={stats}
+              laps={laps}
+              isMonitoring={isMonitoring}
               toggleMonitoring={toggleMonitoring}
               onExit={handleExitDisplay}
               onReset={resetLaps}

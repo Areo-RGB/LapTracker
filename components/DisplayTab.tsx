@@ -30,9 +30,9 @@ const formatTime = (ms: number) => {
 const STORAGE_KEY_FONT_SCALE = 'laptrack-font-scale';
 
 export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring, onExit, onReset, lastActivity, settings }: DisplayTabProps) {
-  const [currentTime, setCurrentTime] = useState(0);
+  // Using ref for direct DOM updates (60fps performance optimization)
   const [pulseType, setPulseType] = useState<'none' | 'fast' | 'slow'>('none');
-  
+
   // Initialize fontScale from localStorage
   const [fontScale, setFontScale] = useState(() => {
     try {
@@ -45,9 +45,10 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
   });
 
   const [showControls, setShowControls] = useState(false);
-  
+
   const lastProcessedLapRef = useRef<number>(0);
   const controlsTimeoutRef = useRef<number | null>(null);
+  const currentTimeRef = useRef<HTMLDivElement>(null);
 
   // Persist fontScale to localStorage
   useEffect(() => {
@@ -63,7 +64,7 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
     // Only trigger if we have a new lap and enough data to compare (count >= 2 because first lap is start)
     if (stats.count >= 1 && stats.last !== lastProcessedLapRef.current && stats.average > 0) {
       const diff = (stats.last - stats.average) / stats.average;
-      
+
       if (diff <= -0.25) {
         setPulseType('fast');
         setTimeout(() => setPulseType('none'), 1200);
@@ -71,20 +72,23 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
         setPulseType('slow');
         setTimeout(() => setPulseType('none'), 1200);
       }
-      
+
       lastProcessedLapRef.current = stats.last;
     }
   }, [stats.last, stats.average, stats.count]);
 
+  // Direct DOM updates for 60fps timer (avoids React re-renders)
   useEffect(() => {
     if (!isMonitoring || laps.length === 0 || lastActivity === 0 || stats.isFinished) {
-      setCurrentTime(0);
+      if (currentTimeRef.current) currentTimeRef.current.textContent = formatTime(0);
       return;
     }
 
     let frameId: number;
     const update = () => {
-      setCurrentTime(Date.now() - lastActivity);
+      if (currentTimeRef.current) {
+        currentTimeRef.current.textContent = formatTime(Date.now() - lastActivity);
+      }
       frameId = requestAnimationFrame(update);
     };
     update();
@@ -121,14 +125,14 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
   };
 
   return (
-    <div 
+    <div
       className="h-full w-full flex items-center justify-center bg-slate-950 overflow-hidden select-none z-50 relative group font-sans cursor-pointer"
       onClick={handleInteraction}
     >
-      
+
       {/* Background Gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-950 pointer-events-none" />
-      
+
       {/* Pulse Overlays */}
       <div className={`absolute inset-0 pointer-events-none transition-opacity duration-500 z-10 ${pulseType === 'fast' ? 'opacity-100' : 'opacity-0'}`}>
         <div className="absolute inset-0 bg-emerald-500/10 animate-pulse" />
@@ -142,29 +146,28 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
       {/* Unified Controls Group (Top Right) */}
       <div className={`absolute top-6 right-6 z-[60] flex flex-col gap-3 transition-all duration-500 ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
         {/* Core Controls */}
-        <button 
-          onClick={(e) => { e.stopPropagation(); onExit(); }} 
+        <button
+          onClick={(e) => { e.stopPropagation(); onExit(); }}
           className="p-3.5 bg-slate-800/80 text-slate-400 rounded-full hover:bg-rose-950/50 hover:text-rose-400 backdrop-blur-md shadow-lg border border-slate-700/50 transition-all active:scale-95"
           title="Exit Fullscreen"
         >
           <X size={24} />
         </button>
-        
-        <button 
-          onClick={(e) => { e.stopPropagation(); toggleMonitoring(); }} 
-          className={`p-3.5 rounded-full backdrop-blur-md shadow-lg border transition-all active:scale-95 ${
-             isMonitoring 
-               ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border-rose-500/30' 
-               : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/30'
-          }`}
+
+        <button
+          onClick={(e) => { e.stopPropagation(); toggleMonitoring(); }}
+          className={`p-3.5 rounded-full backdrop-blur-md shadow-lg border transition-all active:scale-95 ${isMonitoring
+              ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border-rose-500/30'
+              : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/30'
+            }`}
           title={isMonitoring ? "Stop Monitoring" : "Start Monitoring"}
         >
           {isMonitoring ? <Pause size={24} /> : <Play size={24} />}
         </button>
 
         {laps.length > 0 && (
-          <button 
-            onClick={(e) => { e.stopPropagation(); onReset(); }} 
+          <button
+            onClick={(e) => { e.stopPropagation(); onReset(); }}
             className="p-3.5 bg-slate-800/80 text-slate-400 rounded-full hover:bg-rose-950/50 hover:text-rose-400 backdrop-blur-md shadow-lg border border-slate-700/50 transition-all active:scale-95"
             title="Reset Session"
           >
@@ -176,15 +179,15 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
         <div className="h-px bg-slate-800/80 w-full my-1" />
 
         {/* Font Scale Controls */}
-        <button 
-          onClick={(e) => { e.stopPropagation(); adjustScale(0.1); }} 
+        <button
+          onClick={(e) => { e.stopPropagation(); adjustScale(0.1); }}
           className="p-3.5 bg-slate-800/80 text-slate-300 rounded-full hover:bg-cyan-900/50 hover:text-cyan-400 backdrop-blur-md shadow-lg border border-slate-700/50 active:scale-95 transition-all"
           title="Increase Size"
         >
           <Plus size={24} />
         </button>
-        <button 
-          onClick={(e) => { e.stopPropagation(); adjustScale(-0.1); }} 
+        <button
+          onClick={(e) => { e.stopPropagation(); adjustScale(-0.1); }}
           className="p-3.5 bg-slate-800/80 text-slate-300 rounded-full hover:bg-cyan-900/50 hover:text-cyan-400 backdrop-blur-md shadow-lg border border-slate-700/50 active:scale-95 transition-all"
           title="Decrease Size"
         >
@@ -193,7 +196,7 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
       </div>
 
       <div className="flex flex-col items-center justify-center portrait:rotate-90 transition-transform duration-500 origin-center text-center z-20 relative">
-        
+
         {/* Header Label - ONLY Session Complete */}
         <div className="flex flex-col items-center mb-[-2vmax]">
           {stats.isFinished && (
@@ -203,14 +206,14 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
             </div>
           )}
         </div>
-        
+
         {/* Main Stat (Average) */}
-        <div 
+        <div
           className={`font-sans tabular-nums font-black leading-tight tracking-tight flex items-baseline justify-center transition-all duration-300 ease-out ${stats.isFinished ? 'text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 drop-shadow-[0_0_20px_rgba(255,255,255,0.15)]' : getDisplayColor()} ${pulseType !== 'none' ? 'scale-105' : 'scale-100'}`}
-          style={{ 
-            fontSize: stats.isFinished 
-              ? `min(${25 * fontScale}vmax, ${45 * fontScale}vmin)` 
-              : `min(${35 * fontScale}vmax, ${55 * fontScale}vmin)`, 
+          style={{
+            fontSize: stats.isFinished
+              ? `min(${25 * fontScale}vmax, ${45 * fontScale}vmin)`
+              : `min(${35 * fontScale}vmax, ${55 * fontScale}vmin)`,
           }}
         >
           {formatTime(stats.average)}
@@ -239,22 +242,23 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
           /* Live Running Timer - Conditionally Rendered based on settings */
           settings.showCurrentLapDisplay && (
             <div className="flex flex-col items-center mt-4">
-               <div className="flex items-center gap-3 mb-2">
-                  <div className="text-slate-500 uppercase tracking-widest font-bold" style={{ fontSize: 'min(1.5vmax, 1.5vmin)' }}>
-                    Current Lap
+              <div className="flex items-center gap-3 mb-2">
+                <div className="text-slate-500 uppercase tracking-widest font-bold" style={{ fontSize: 'min(1.5vmax, 1.5vmin)' }}>
+                  Current Lap
+                </div>
+                {stats.targetLaps > 0 && laps.length > 0 && (
+                  <div className="bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-md font-mono font-bold border border-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.1)]" style={{ fontSize: 'min(1.5vmax, 1.5vmin)' }}>
+                    {Math.min(stats.count + 1, stats.targetLaps)}<span className="text-cyan-600 mx-0.5">/</span>{stats.targetLaps}
                   </div>
-                  {stats.targetLaps > 0 && laps.length > 0 && (
-                    <div className="bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-md font-mono font-bold border border-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.1)]" style={{ fontSize: 'min(1.5vmax, 1.5vmin)' }}>
-                      {Math.min(stats.count + 1, stats.targetLaps)}<span className="text-cyan-600 mx-0.5">/</span>{stats.targetLaps}
-                    </div>
-                  )}
-               </div>
-               <div 
-                 className="font-mono tabular-nums font-bold text-cyan-400 leading-tight drop-shadow-[0_0_15px_rgba(34,211,238,0.3)]"
-                 style={{ fontSize: 'min(8vmax, 12vmin)' }}
-               >
-                 {formatTime(currentTime)}
-               </div>
+                )}
+              </div>
+              <div
+                ref={currentTimeRef}
+                className="font-mono tabular-nums font-bold text-cyan-400 leading-tight drop-shadow-[0_0_15px_rgba(34,211,238,0.3)]"
+                style={{ fontSize: 'min(8vmax, 12vmin)' }}
+              >
+                {formatTime(0)}
+              </div>
             </div>
           )
         )}
