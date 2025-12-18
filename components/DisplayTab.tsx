@@ -126,12 +126,12 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
 
   return (
     <div
-      className="h-full w-full flex items-center justify-center bg-slate-950 overflow-hidden select-none z-50 relative group font-sans cursor-pointer"
+      className="h-full w-full flex items-center justify-center bg-black overflow-hidden select-none z-50 relative group font-sans cursor-pointer"
       onClick={handleInteraction}
     >
 
-      {/* Background Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-950 pointer-events-none" />
+      {/* Background - Pure Black */}
+      <div className="absolute inset-0 bg-black pointer-events-none" />
 
       {/* Pulse Overlays */}
       <div className={`absolute inset-0 pointer-events-none transition-opacity duration-500 z-10 ${pulseType === 'fast' ? 'opacity-100' : 'opacity-0'}`}>
@@ -157,8 +157,8 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
         <button
           onClick={(e) => { e.stopPropagation(); toggleMonitoring(); }}
           className={`p-3.5 rounded-full backdrop-blur-md shadow-lg border transition-all active:scale-95 ${isMonitoring
-              ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border-rose-500/30'
-              : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/30'
+            ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border-rose-500/30'
+            : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/30'
             }`}
           title={isMonitoring ? "Stop Monitoring" : "Start Monitoring"}
         >
