@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Lap, AppSettings } from '../types';
-import { X, Play, Pause, Trophy, Plus, Minus, Trash2 } from 'lucide-react';
+import { X, Play, Pause, Trophy, Plus, Minus, Trash2, Home, Settings } from 'lucide-react';
 
 interface DisplayTabProps {
   stats: {
@@ -11,6 +11,7 @@ interface DisplayTabProps {
     slowest: number;
     isFinished: boolean;
     targetLaps: number;
+    targetDuration: number;
   };
   laps: Lap[];
   isMonitoring: boolean;
@@ -19,6 +20,8 @@ interface DisplayTabProps {
   onReset: () => void;
   lastActivity: number;
   settings: AppSettings;
+  setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
+  onOpenSettings: () => void;
 }
 
 const formatTime = (ms: number) => {
@@ -29,7 +32,7 @@ const formatTime = (ms: number) => {
 
 const STORAGE_KEY_FONT_SCALE = 'laptrack-font-scale';
 
-export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring, onExit, onReset, lastActivity, settings }: DisplayTabProps) {
+export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring, onExit, onReset, lastActivity, settings, setSettings, onOpenSettings }: DisplayTabProps) {
   // Using ref for direct DOM updates (60fps performance optimization)
   const [pulseType, setPulseType] = useState<'none' | 'fast' | 'slow'>('none');
 
@@ -49,6 +52,7 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
   const lastProcessedLapRef = useRef<number>(0);
   const controlsTimeoutRef = useRef<number | null>(null);
   const currentTimeRef = useRef<HTMLDivElement>(null);
+  const sessionTimeRef = useRef<HTMLDivElement>(null);
 
   // Persist fontScale to localStorage
   useEffect(() => {
@@ -94,6 +98,31 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
     update();
     return () => cancelAnimationFrame(frameId);
   }, [isMonitoring, laps.length, lastActivity, stats.isFinished]);
+
+  // Direct DOM updates for session time timer (60fps)
+  useEffect(() => {
+    if (!isMonitoring || laps.length === 0 || stats.targetDuration === 0 || stats.isFinished) {
+      if (sessionTimeRef.current) sessionTimeRef.current.textContent = '0:00';
+      return;
+    }
+
+    const sessionStartTime = laps[0].timestamp;
+    const targetDurationMs = stats.targetDuration * 1000;
+
+    let frameId: number;
+    const update = () => {
+      if (sessionTimeRef.current) {
+        const elapsed = Date.now() - sessionStartTime;
+        const remaining = Math.max(0, targetDurationMs - elapsed);
+        const minutes = Math.floor(remaining / 60000);
+        const seconds = Math.floor((remaining % 60000) / 1000);
+        sessionTimeRef.current.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }
+      frameId = requestAnimationFrame(update);
+    };
+    update();
+    return () => cancelAnimationFrame(frameId);
+  }, [isMonitoring, laps, stats.targetDuration, stats.isFinished]);
 
   // Clean up timeout on unmount
   useEffect(() => {
@@ -152,6 +181,23 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
           title="Exit Fullscreen"
         >
           <X size={24} />
+        </button>
+
+        <a
+          href="/#monitor"
+          onClick={(e) => { e.stopPropagation(); }}
+          className="p-3.5 bg-slate-800/80 text-slate-400 rounded-full hover:bg-cyan-950/50 hover:text-cyan-400 backdrop-blur-md shadow-lg border border-slate-700/50 transition-all active:scale-95 flex items-center justify-center"
+          title="Go to Monitor"
+        >
+          <Home size={24} />
+        </a>
+
+        <button
+          onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
+          className="p-3.5 bg-slate-800/80 text-slate-400 rounded-full hover:bg-cyan-950/50 hover:text-cyan-400 backdrop-blur-md shadow-lg border border-slate-700/50 transition-all active:scale-95 group"
+          title="Configure Settings"
+        >
+          <Settings size={24} className="group-hover:rotate-90 transition-transform duration-500" />
         </button>
 
         <button
@@ -219,6 +265,22 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
           {formatTime(stats.average)}
         </div>
 
+        {/* Session Time Remaining - Only when target duration is set and not finished */}
+        {!stats.isFinished && stats.targetDuration > 0 && laps.length > 0 && (
+          <div className="flex flex-col items-center mt-3">
+            <div className="text-slate-500 uppercase tracking-widest font-bold mb-1" style={{ fontSize: 'min(1.2vmax, 1.2vmin)' }}>
+              Time Remaining
+            </div>
+            <div
+              ref={sessionTimeRef}
+              className="font-mono tabular-nums font-bold text-amber-400 leading-tight drop-shadow-[0_0_10px_rgba(251,191,36,0.3)]"
+              style={{ fontSize: 'min(4vmax, 6vmin)' }}
+            >
+              0:00
+            </div>
+          </div>
+        )}
+
         {/* Secondary Stats Section */}
         {stats.isFinished ? (
           <div className="mt-8 grid grid-cols-2 gap-x-16 gap-y-4 border-t border-slate-800/50 pt-8">
@@ -234,8 +296,13 @@ export default function DisplayTab({ stats, laps, isMonitoring, toggleMonitoring
                 {formatTime(stats.slowest)}
               </div>
             </div>
-            <div className="col-span-2 text-slate-500 font-mono mt-4 uppercase tracking-widest font-medium" style={{ fontSize: 'min(1.2vmax, 1.2vmin)' }}>
-              Completed {stats.count} Laps
+            <div className="col-span-2 text-slate-500 font-mono mt-4 uppercase tracking-widest font-medium space-y-1" style={{ fontSize: 'min(1.2vmax, 1.2vmin)' }}>
+              <div>Completed {stats.count} Laps</div>
+              {stats.targetDuration > 0 && laps.length > 0 && (
+                <div className="text-amber-400/80">
+                  Total Time: {Math.floor((laps[laps.length - 1].timestamp - laps[0].timestamp) / 60000)}:{String(Math.floor(((laps[laps.length - 1].timestamp - laps[0].timestamp) % 60000) / 1000)).padStart(2, '0')}
+                </div>
+              )}
             </div>
           </div>
         ) : (

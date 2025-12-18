@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS = {
   devMode: false,
   showCurrentLapDisplay: false,
   targetLaps: 0,
+  targetDuration: 0,
 };
 
 export const MAX_HISTORY_LAPS = 100;

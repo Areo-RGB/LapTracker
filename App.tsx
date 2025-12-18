@@ -86,6 +86,25 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  // Check for time-based session completion
+  useEffect(() => {
+    if (!isMonitoring || laps.length === 0 || settings.targetDuration === 0) {
+      return;
+    }
+
+    const sessionStartTime = laps[0].timestamp;
+    const targetDurationMs = settings.targetDuration * 1000;
+
+    const checkInterval = setInterval(() => {
+      const elapsedTime = Date.now() - sessionStartTime;
+      if (elapsedTime >= targetDurationMs) {
+        setIsMonitoring(false);
+      }
+    }, 100); // Check every 100ms for accuracy
+
+    return () => clearInterval(checkInterval);
+  }, [isMonitoring, laps, settings.targetDuration]);
+
   // Core logic to record a lap
   const handleMotionTriggered = useCallback((timestamp: number) => {
     setLastActivity(timestamp);
@@ -125,7 +144,10 @@ export default function App() {
       setIsMonitoring(false);
     } else {
       const completedLaps = laps.filter(l => l.duration > 0).length;
-      const isFinished = settings.targetLaps > 0 && completedLaps >= settings.targetLaps;
+      const lapTargetReached = settings.targetLaps > 0 && completedLaps >= settings.targetLaps;
+      const timeTargetReached = settings.targetDuration > 0 && laps.length > 0 &&
+        (Date.now() - laps[0].timestamp) >= settings.targetDuration * 1000;
+      const isFinished = lapTargetReached || timeTargetReached;
 
       setIsMonitoring(true);
 
@@ -140,7 +162,7 @@ export default function App() {
         }]);
       }
     }
-  }, [isMonitoring, laps, settings.targetLaps]);
+  }, [isMonitoring, laps, settings.targetLaps, settings.targetDuration]);
 
   const handleEnterDisplay = useCallback(() => {
     setActiveTab(Tab.DISPLAY);
@@ -163,7 +185,7 @@ export default function App() {
     const validLaps = laps.filter(l => l.duration > 0);
     const count = validLaps.length;
 
-    if (count === 0) return { average: 0, count: 0, last: 0, fastest: 0, slowest: 0, isFinished: false, targetLaps: settings.targetLaps };
+    if (count === 0) return { average: 0, count: 0, last: 0, fastest: 0, slowest: 0, isFinished: false, targetLaps: settings.targetLaps, targetDuration: settings.targetDuration };
 
     const durations = validLaps.map(l => l.duration);
     const totalTime = durations.reduce((acc, curr) => acc + curr, 0);
@@ -171,10 +193,15 @@ export default function App() {
     const last = durations[durations.length - 1];
     const fastest = Math.min(...durations);
     const slowest = Math.max(...durations);
-    const isFinished = settings.targetLaps > 0 && count >= settings.targetLaps;
 
-    return { average, count, last, fastest, slowest, isFinished, targetLaps: settings.targetLaps };
-  }, [laps, settings.targetLaps]);
+    // Check if session is finished by lap count OR duration
+    const lapTargetReached = settings.targetLaps > 0 && count >= settings.targetLaps;
+    const timeTargetReached = settings.targetDuration > 0 && laps.length > 0 &&
+      (Date.now() - laps[0].timestamp) >= settings.targetDuration * 1000;
+    const isFinished = lapTargetReached || timeTargetReached;
+
+    return { average, count, last, fastest, slowest, isFinished, targetLaps: settings.targetLaps, targetDuration: settings.targetDuration };
+  }, [laps, settings.targetLaps, settings.targetDuration, isMonitoring]);
 
   const isDisplayMode = activeTab === Tab.DISPLAY;
 
@@ -273,13 +300,6 @@ export default function App() {
               </button>
             </div>
           </div>
-
-          <ConfigTab
-            settings={settings}
-            setSettings={setSettings}
-            isOpen={showSettings}
-            onClose={() => setShowSettings(false)}
-          />
         </div>
 
         {activeTab === Tab.DISPLAY && (
@@ -293,9 +313,19 @@ export default function App() {
               onReset={resetLaps}
               lastActivity={lastActivity}
               settings={settings}
+              setSettings={setSettings}
+              onOpenSettings={() => setShowSettings(true)}
             />
           </div>
         )}
+
+        {/* ConfigTab Modal - Available in both modes */}
+        <ConfigTab
+          settings={settings}
+          setSettings={setSettings}
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
+        />
       </main>
 
 

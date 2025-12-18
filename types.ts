@@ -8,6 +8,7 @@ export interface AppSettings {
   devMode: boolean; // Replaces showTimerOverlay
   showCurrentLapDisplay: boolean;
   targetLaps: number; // 0 for infinite, >0 for target
+  targetDuration: number; // 0 for infinite, >0 for target duration in seconds
 }
 
 export interface Lap {
