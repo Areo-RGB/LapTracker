@@ -31,10 +31,10 @@ const TimerOverlay = ({ isMonitoring, lastActivity, hasLaps }: { isMonitoring: b
   return (
     <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none">
       <div className={`px-4 py-3 rounded-xl backdrop-blur-md border shadow-2xl transition-all duration-300 ${!isMonitoring
-          ? 'bg-slate-900/80 border-slate-700/50'
-          : !hasLaps
-            ? 'bg-amber-900/40 border-amber-700/30'
-            : 'bg-slate-900/80 border-cyan-500/30 shadow-cyan-500/10'
+        ? 'bg-slate-900/80 border-slate-700/50'
+        : !hasLaps
+          ? 'bg-amber-900/40 border-amber-700/30'
+          : 'bg-slate-900/80 border-cyan-500/30 shadow-cyan-500/10'
         }`}>
         <div className="flex items-center gap-2.5 mb-1.5">
           <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${isMonitoring ? 'bg-emerald-400 text-emerald-400 animate-pulse' : 'bg-rose-500 text-rose-500'}`} />
@@ -185,13 +185,6 @@ export default function App() {
       )}
 
       <main className="flex-1 relative overflow-hidden flex flex-col bg-slate-950">
-        {/* Background Grid Pattern */}
-        <div className="absolute inset-0 opacity-10 pointer-events-none"
-          style={{
-            backgroundImage: `radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.15) 1px, transparent 0)`,
-            backgroundSize: '40px 40px'
-          }}
-        />
 
         <div className={`absolute inset-0 z-0 ${activeTab === Tab.CONFIG ? 'visible' : 'invisible pointer-events-none opacity-0'}`}>
           <MotionEngine
@@ -213,29 +206,27 @@ export default function App() {
           {/* Controls Layer */}
           <div className="absolute inset-0 z-10 pointer-events-none">
             {/* Settings Button - Top Right */}
-            <div className="absolute top-4 right-4 pointer-events-auto">
+            <div className="absolute top-3 right-3 pointer-events-auto">
               <button
                 onClick={() => setShowSettings(true)}
-                className="p-3 bg-slate-900/80 text-slate-300 hover:text-cyan-400 backdrop-blur-md rounded-full border border-slate-700/50 shadow-xl hover:bg-slate-800 hover:border-cyan-500/30 transition-all duration-300 group"
+                className="p-2.5 bg-black/60 text-slate-400 hover:text-cyan-400 backdrop-blur-sm rounded-xl border border-slate-700/50 hover:border-cyan-500/30 transition-all duration-300 group"
                 title="Configure Settings"
               >
-                <Settings size={22} className="group-hover:rotate-90 transition-transform duration-500" />
+                <Settings size={20} className="group-hover:rotate-90 transition-transform duration-500" />
               </button>
             </div>
 
-            {/* Start/Stop Button - Bottom Center */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-auto">
+            {/* Start/Stop Button - Bottom, integrated with nav */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto">
               <button
                 onClick={toggleMonitoring}
-                className={`flex items-center gap-3 pl-6 pr-8 py-4 rounded-full font-bold uppercase tracking-wider shadow-2xl transition-all duration-300 transform active:scale-95 group ${isMonitoring
-                    ? 'bg-rose-500/90 text-white shadow-[0_0_25px_rgba(244,63,94,0.4)] hover:bg-rose-500 border border-rose-400/50'
-                    : 'bg-cyan-500/90 text-white shadow-[0_0_25px_rgba(6,182,212,0.4)] hover:bg-cyan-500 border border-cyan-400/50'
+                className={`flex items-center gap-2.5 px-6 py-3 rounded-full font-semibold uppercase tracking-wide text-sm shadow-2xl transition-all duration-300 transform active:scale-95 ${isMonitoring
+                  ? 'bg-rose-500 text-white shadow-rose-500/30 hover:bg-rose-400'
+                  : 'bg-cyan-500 text-white shadow-cyan-500/30 hover:bg-cyan-400'
                   }`}
               >
-                <div className={`p-1 rounded-full ${isMonitoring ? 'bg-rose-700/30' : 'bg-cyan-700/30'}`}>
-                  {isMonitoring ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
-                </div>
-                <span className="text-sm">{isMonitoring ? 'Stop Detection' : 'Start Detection'}</span>
+                {isMonitoring ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-0.5" />}
+                <span>{isMonitoring ? 'Stop' : 'Start'}</span>
               </button>
             </div>
           </div>
@@ -265,20 +256,20 @@ export default function App() {
       </main>
 
       {!isDisplayMode && (
-        <nav className="flex-none h-20 bg-slate-950 border-t border-slate-800 flex items-stretch z-30 px-6 pb-2 pt-2 gap-4">
+        <nav className="flex-none h-16 bg-slate-900/50 backdrop-blur-sm border-t border-slate-800/50 flex items-center z-30 px-4 gap-2">
           <button
             onClick={() => setActiveTab(Tab.CONFIG)}
-            className={`flex-1 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all duration-300 ${activeTab === Tab.CONFIG ? 'bg-slate-900 text-cyan-400 border border-slate-800 shadow-lg shadow-black/50' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-900/50'}`}
+            className={`flex-1 h-12 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 ${activeTab === Tab.CONFIG ? 'bg-slate-800 text-cyan-400' : 'text-slate-500 hover:text-slate-300'}`}
           >
-            <Activity size={22} className={activeTab === Tab.CONFIG ? 'drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : ''} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Monitor</span>
+            <Activity size={18} className={activeTab === Tab.CONFIG ? 'drop-shadow-[0_0_6px_rgba(34,211,238,0.5)]' : ''} />
+            <span className="text-xs font-semibold uppercase tracking-wide">Monitor</span>
           </button>
           <button
             onClick={handleEnterDisplay}
-            className={`flex-1 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all duration-300 text-slate-500 hover:text-slate-300 hover:bg-slate-900/50`}
+            className="flex-1 h-12 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 text-slate-500 hover:text-slate-300"
           >
-            <Timer size={22} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Display</span>
+            <Timer size={18} />
+            <span className="text-xs font-semibold uppercase tracking-wide">Display</span>
           </button>
         </nav>
       )}
