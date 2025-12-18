@@ -1,0 +1,7 @@
+{
+  "name": "LapTrack AI",
+  "description": "Virtual tripwire lap timer using motion detection.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
