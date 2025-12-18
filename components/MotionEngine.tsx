@@ -8,10 +8,63 @@ interface MotionEngineProps {
   lastActivityTimestamp: number;
 }
 
+// Inline Worker Code
+const WORKER_CODE = `
+  let prevPixels = null;
+
+  self.onmessage = function(e) {
+    const { type, data, width, height } = e.data;
+
+    if (type === 'RESET') {
+      prevPixels = null;
+      return;
+    }
+
+    if (type === 'PROCESS') {
+      // Create a view on the transferred buffer
+      const pixels = new Uint8ClampedArray(data);
+      
+      // If dimensions changed or no prev frame, reset
+      if (prevPixels && prevPixels.length !== pixels.length) {
+        prevPixels = null;
+      }
+
+      if (!prevPixels) {
+        // Store first frame copy
+        prevPixels = new Uint8ClampedArray(pixels);
+        self.postMessage({ diff: 0 });
+        return;
+      }
+
+      let diffScore = 0;
+      let pixelsChecked = 0;
+      // Sampling rate optimization
+      const skip = pixels.length > 50000 ? 16 : 4; 
+
+      for (let i = 0; i < pixels.length; i += skip * 4) {
+        const rDiff = Math.abs(pixels[i] - prevPixels[i]);
+        const gDiff = Math.abs(pixels[i+1] - prevPixels[i+1]);
+        const bDiff = Math.abs(pixels[i+2] - prevPixels[i+2]);
+        
+        diffScore += (rDiff + gDiff + bDiff);
+        pixelsChecked++;
+      }
+
+      const normalizedDiff = pixelsChecked > 0 ? diffScore / pixelsChecked : 0;
+      
+      // Update previous frame with current frame data
+      prevPixels.set(pixels);
+      
+      self.postMessage({ diff: normalizedDiff });
+    }
+  };
+`;
+
 export default function MotionEngine({ settings, onMotionTriggered, isMonitoring, lastActivityTimestamp }: MotionEngineProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const workerRef = useRef<Worker | null>(null);
   
   // Logic Refs
   const lastTriggerRef = useRef<number>(0);
@@ -20,12 +73,51 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
   const lastFpsTimeRef = useRef<number>(0);
   const frameCountRef = useRef<number>(0);
   const [fps, setFps] = useState<number>(0);
-
-  // Previous frame data for difference calculation
-  const prevPixelDataRef = useRef<Uint8ClampedArray | null>(null);
   
   const [error, setError] = useState<string | null>(null);
   const [debugDiff, setDebugDiff] = useState(0);
+
+  // Initialize Worker
+  useEffect(() => {
+    const blob = new Blob([WORKER_CODE], { type: 'application/javascript' });
+    const worker = new Worker(URL.createObjectURL(blob));
+    workerRef.current = worker;
+
+    return () => {
+      worker.terminate();
+    };
+  }, []);
+
+  // Worker Message Handler - Handles the RESULT of the calculation
+  useEffect(() => {
+    const worker = workerRef.current;
+    if (!worker) return;
+
+    const handleMessage = (e: MessageEvent) => {
+      const { diff } = e.data;
+      setDebugDiff(diff);
+
+      const now = Date.now();
+      const onCooldown = now - lastTriggerRef.current < settings.cooldown;
+      const threshold = 105 - settings.sensitivity; 
+
+      if (diff > threshold && !onCooldown && isMonitoring) {
+        lastTriggerRef.current = now;
+        onMotionTriggered(now);
+      }
+    };
+
+    worker.onmessage = handleMessage;
+    
+    // Reset worker state when monitoring stops/starts to avoid diffing against old frames
+    if (!isMonitoring) {
+      worker.postMessage({ type: 'RESET' });
+    }
+
+    return () => {
+      worker.onmessage = null;
+    };
+  }, [isMonitoring, settings.sensitivity, settings.cooldown, onMotionTriggered]);
 
   // Initialize Camera
   useEffect(() => {
@@ -65,7 +157,7 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
     };
   }, []);
 
-  // Motion Detection Loop
+  // Rendering & Capture Loop
   useEffect(() => {
     let rafId: number | null = null;
     let rvfcId: number | null = null;
@@ -84,7 +176,7 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
       const video = videoRef.current;
       const canvas = canvasRef.current;
       
-      // Safety Check: If video isn't ready, fallback to RAF to retry next frame
+      // Safety Check
       if (!video || !canvas || video.readyState < 2) {
          rafId = requestAnimationFrame(processFrame);
          return;
@@ -95,7 +187,6 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
         canvas.height = video.videoHeight;
       }
 
-      // Optimization: alpha: false removes the transparency channel, speeding up compositing
       const ctx = canvas.getContext('2d', { 
         willReadFrequently: true,
         alpha: false 
@@ -126,17 +217,24 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
         ctx.filter = 'none';
       }
 
-      // 3. CAPTURE DATA FOR MOTION DETECTION
-      let currentFrameData: Uint8ClampedArray | null = null;
-      if (isMonitoring) {
-        currentFrameData = ctx.getImageData(sampleX, sampleY, zoneW, zoneH).data;
+      // 3. CAPTURE & SEND TO WORKER
+      if (isMonitoring && workerRef.current) {
+        const imageData = ctx.getImageData(sampleX, sampleY, zoneW, zoneH);
+        // We transfer the buffer to the worker (zero-copy)
+        workerRef.current.postMessage({ 
+          type: 'PROCESS',
+          data: imageData.data.buffer,
+          width: zoneW,
+          height: zoneH
+        }, [imageData.data.buffer]);
       }
 
       // 4. Draw Zone Overlay Box
+      // We check lastTriggerRef directly for immediate UI feedback even if the worker is processing asynchronously
       const onCooldown = now - lastTriggerRef.current < settings.cooldown;
       
       ctx.shadowBlur = 10;
-      ctx.shadowColor = onCooldown ? '#f43f5e' : '#06b6d4'; // Rose-500 or Cyan-500
+      ctx.shadowColor = onCooldown ? '#f43f5e' : '#06b6d4'; 
       
       ctx.lineWidth = 2;
       ctx.strokeStyle = onCooldown ? 'rgba(244, 63, 94, 0.8)' : 'rgba(6, 182, 212, 0.8)';
@@ -146,49 +244,13 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
       ctx.fillRect(sampleX, sampleY, zoneW, zoneH);
       ctx.shadowBlur = 0;
 
-      // 5. Motion Logic processing
-      if (isMonitoring && currentFrameData) {
-        const data = currentFrameData;
-        
-        let diffScore = 0;
-        let pixelsChecked = 0;
-
-        if (prevPixelDataRef.current && prevPixelDataRef.current.length === data.length) {
-          const prevData = prevPixelDataRef.current;
-          const skip = data.length > 50000 ? 16 : 4; 
-          
-          for (let i = 0; i < data.length; i += skip * 4) {
-            const rDiff = Math.abs(data[i] - prevData[i]);
-            const gDiff = Math.abs(data[i + 1] - prevData[i + 1]);
-            const bDiff = Math.abs(data[i + 2] - prevData[i + 2]);
-            
-            diffScore += (rDiff + gDiff + bDiff);
-            pixelsChecked++;
-          }
-          
-          const normalizedDiff = diffScore / pixelsChecked; 
-          setDebugDiff(normalizedDiff);
-
-          const threshold = 105 - settings.sensitivity; 
-
-          if (normalizedDiff > threshold && !onCooldown) {
-            // TRIGGER
-            lastTriggerRef.current = now;
-            onMotionTriggered(now);
-            
-            ctx.fillStyle = 'rgba(6, 182, 212, 0.3)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-          }
-        }
-
-        prevPixelDataRef.current = new Uint8ClampedArray(data);
-      } else {
-        prevPixelDataRef.current = null;
+      // Visual Flash if triggered recently
+      if (onCooldown && isMonitoring) {
+         ctx.fillStyle = 'rgba(6, 182, 212, 0.3)';
+         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
       // Schedule next frame
-      // CRITICAL: We prioritize requestVideoFrameCallback to sync with the CAMERA FPS (e.g. 60Hz)
-      // instead of the monitor refresh rate (e.g. 75Hz). This avoids processing duplicate frames.
       if ('requestVideoFrameCallback' in video) {
         rvfcId = (video as any).requestVideoFrameCallback(processFrame);
       } else {
@@ -205,7 +267,7 @@ export default function MotionEngine({ settings, onMotionTriggered, isMonitoring
         (videoRef.current as any).cancelVideoFrameCallback(rvfcId);
       }
     };
-  }, [settings, isMonitoring, onMotionTriggered]);
+  }, [settings, isMonitoring]); // Removed onMotionTriggered from dep array to avoid re-binding loop
 
   return (
     <div 
