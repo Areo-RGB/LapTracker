@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
             description: 'Motion-based lap timer with AI-powered detection',
             theme_color: '#0f172a',
             background_color: '#0f172a',
-            display: 'fullscreen',
+            display: 'standalone',
             orientation: 'any',
             start_url: '/',
             icons: [
